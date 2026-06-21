@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: prefixiq-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=prefixiq
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d prefixiq"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - prefixiq-net
+
+  redis-1:
+    image: redis:7-alpine
+    container_name: prefixiq-redis-1
+    ports:
+      - "6379:6379"
+    networks:
+      - prefixiq-net
+
+  redis-2:
+    image: redis:7-alpine
+    container_name: prefixiq-redis-2
+    ports:
+      - "6380:6379"
+    networks:
+      - prefixiq-net
+
+  redis-3:
+    image: redis:7-alpine
+    container_name: prefixiq-redis-3
+    ports:
+      - "6381:6379"
+    networks:
+      - prefixiq-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: prefixiq-backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/prefixiq
+      - REDIS_NODES=redis-1:6379,redis-2:6379,redis-3:6379
+      - BATCH_FLUSH_INTERVAL=5.0
+      - BATCH_SIZE_THRESHOLD=100
+      - DECAY_RATE=0.0001
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-1:
+        condition: service_started
+      redis-2:
+        condition: service_started
+      redis-3:
+        condition: service_started
+    networks:
+      - prefixiq-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: prefixiq-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - prefixiq-net
+
+volumes:
+  postgres_data:
+
+networks:
+  prefixiq-net:
+    driver: bridge
