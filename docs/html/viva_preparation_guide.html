@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5. Code & Viva Prep Guide - PrefixIQ</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            850: '#1e1e24',
+                            950: '#09090b',
+                        },
+                        violet: {
+                            950: '#1e1b4b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Prism.js Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <!-- Mermaid.js for Diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'dark',
+            securityLevel: 'loose'
+        });
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #09090b;
+        }
+        code, pre {
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+        /* Markdown table styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+        th, td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #27272a;
+            text-align: left;
+        }
+        th {
+            background-color: #18181b;
+            color: #ffffff;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: rgba(39, 39, 42, 0.2);
+        }
+    </style>
+</head>
+<body class="text-zinc-300">
+    <div class="flex min-h-screen">
+        <!-- Sidebar Navigation -->
+        <aside class="w-80 bg-zinc-950 border-r border-zinc-800 p-6 flex flex-col justify-between hidden md:flex">
+            <div>
+                <div class="flex items-center gap-2 mb-8">
+                    <span class="w-3 h-3 rounded-full bg-violet-500 animate-pulse"></span>
+                    <span class="text-white font-extrabold text-xl tracking-tight">Prefix<span class="text-violet-400">IQ</span></span>
+                    <span class="text-[10px] text-zinc-500 border border-zinc-800 px-1.5 py-0.5 rounded">Docs</span>
+                </div>
+                <nav class="space-y-1.5">
+                    <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block mb-2 px-3">Documentation Pages</span>
+                    <a href="NAVIGATION.html" class="flex items-center px-3 py-2 text-sm font-semibold rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors">Master Navigation Index</a>
+<a href="fundamentals_and_tradeoffs.html" class="flex items-center px-3 py-2 text-sm font-semibold rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors">1. Fundamentals & Trade-offs</a>
+<a href="architecture_and_components.html" class="flex items-center px-3 py-2 text-sm font-semibold rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors">2. Architecture & Components</a>
+<a href="trending_and_algorithms.html" class="flex items-center px-3 py-2 text-sm font-semibold rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors">3. Trending & Algorithms</a>
+<a href="docker_and_performance.html" class="flex items-center px-3 py-2 text-sm font-semibold rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors">4. Infrastructure & Performance</a>
+<a href="viva_preparation_guide.html" class="flex items-center px-3 py-2 text-sm font-semibold rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors">5. Code & Viva Prep Guide</a>
+                </nav>
+            </div>
+            <div class="pt-6 border-t border-zinc-900 text-xs text-zinc-600">
+                PrefixIQ System Design Guide
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 p-6 md:p-12 overflow-y-auto max-w-5xl mx-auto w-full">
+            <!-- Mobile Header -->
+            <div class="flex items-center justify-between pb-6 mb-8 border-b border-zinc-900 md:hidden">
+                <span class="text-white font-extrabold text-lg">Prefix<span class="text-violet-400">IQ</span> Docs</span>
+                <span class="text-xs text-zinc-500">Menu</span>
+            </div>
+
+            <!-- Page Article Content -->
+            <article class="prose prose-invert max-w-none space-y-6">
+                <h1 class="text-3xl font-extrabold text-white tracking-tight mt-8 mb-4 border-b border-zinc-900 pb-2">Code Walkthrough & Viva Preparation Guide</h1>
+<p class="leading-relaxed text-[15px] my-3">This document acts as an interactive coaching guide, providing a complete structural walkthrough of the codebase and compiling 40+ mock viva questions and answers.</p>
+<p class="leading-relaxed text-[15px] my-3">---</p>
+<h2 class="text-2xl font-bold text-white tracking-tight mt-8 mb-4 border-b border-zinc-900/50 pb-1.5">1. Codebase Structural Walkthrough</h2>
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">1.1 Backend Component</h3>
+<ul class="my-4 space-y-1"><li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">main.py</span></strong>: Maps FastAPI routing, startup seeding, metrics middlewares, health checks, and Prometheus metrics.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">config.py</span></strong>: Loads configuration settings via Pydantic BaseSettings.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">database.py</span></strong>: Manages engine pools and session factories.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">models.py</span></strong>: Holds tables schemas for <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">queries</code> and <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">search_logs</code>. Maps B-Tree indexing pattern.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">consistent_hashing.py</span></strong>: Custom Hash Ring positioning and dynamic Redis sharding routing.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">batch_writer.py</span></strong>: Runs the background async queue worker, aggregates counts, and executes active prefix invalidations.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">ranking.py</span></strong>: Basic counts and logarithmic time-decay trending SQL logic.</li>
+</ul>
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">1.2 Frontend Component</h3>
+<ul class="my-4 space-y-1"><li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">page.tsx</span></strong>: Main assembly page with reactive hooks.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">SearchBar.tsx</span></strong>: UI input field, keyboard arrows listener, debounce fetches.</li>
+<li class="list-disc ml-6 py-0.5 text-[15px]"><strong><span class="text-zinc-200 font-mono">Dashboard.tsx</span></strong>: System KPIs, sharding server states, and consistent hash debug ring resolver.</li>
+</ul>
+---
+<h2 class="text-2xl font-bold text-white tracking-tight mt-8 mb-4 border-b border-zinc-900/50 pb-1.5">2. Top 20 Mock Viva Questions & Expected Answers</h2>
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q1: The assignment asks for an open-source dataset. What dataset did you use and how is it loaded?</h3>
+<em> <strong>Answer</strong>: "We seed the system using a preprocessed subset of the <strong>Microsoft ORCAS click log dataset</strong> stored in <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">data/orcas_queries.csv</code>. This CSV contains 105,000+ unique search queries. During container startup, <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">seed_queries.py</code> reads this CSV and populates the <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">queries</code> table in PostgreSQL in batches of 10,000 to optimize seeding time."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q2: What is Zipf's Law and why is it relevant to a search autocomplete system?</h3>
+</em> <strong>Answer</strong>: "Zipf's Law states that in a natural language corpus, the frequency of any query is inversely proportional to its rank. In search systems, this means a tiny percentage of queries drive the vast majority of traffic. Because of this power-law distribution, prefix caching is highly effective: caching suggestions for the top 10% of prefixes can serve 80%+ of typeahead traffic, protecting our primary database."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q3: Why did you implement a custom Consistent Hashing ring rather than standard sharding or Redis Cluster?</h3>
+<em> <strong>Answer</strong>: "Modulo sharding ($Hash(K) \% N$) causes cache stampedes when scaling because changing $N$ invalidates almost all keys. Consistent Hashing maps both keys and nodes on a circular ring, so adding or removing a node only re-maps $\frac{1}{N}$ of the keys. We bypass Redis Cluster because it automates slot sharding internally; writing our own consistent hashing ring on the backend demonstrates how database routing works at the application layer."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q4: Why does your Consistent Hashing ring use virtual nodes (replicas)?</h3>
+</em> <strong>Answer</strong>: "If we only place physical nodes (e.g. <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">redis-1</code>, <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">redis-2</code>, <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">redis-3</code>) on the ring, they are unlikely to be spaced evenly. This leads to <strong>hotspots</strong> where one server handles 80% of keys. By representing each physical node with 100 virtual nodes (replicas) scattered across the ring, we ensure that keys are distributed uniformly, balancing the memory load."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q5: How does your Enhanced Trending Search ranking work? Why logarithmic scaling?</h3>
+<em> <strong>Answer</strong>: "Our scoring formula is:
+  $$Score = 0.8 \times \ln(Count_{historical} + 1) + 0.2 \times \sum e^{-\lambda \Delta t}$$
+  Applying $\ln(Count)$ compresses historical counts so they don't scale linearly, saving space for recent spikes to compete. The second term aggregates recent searches from the last 24 hours, exponentially decaying their weight based on age ($\lambda = 0.0001$, half-life $\approx 1.9$ hours). This allows trending queries to bubble up during traffic spikes, and naturally cool down over time."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q6: What database index did you use for prefix search, and why?</h3>
+</em> <strong>Answer</strong>: "We created a PostgreSQL B-Tree index on <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">queries(query varchar_pattern_ops)</code>. By default, PostgreSQL B-Tree indexes use locale-specific collations, which prevents them from accelerating prefix queries (<code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">LIKE 'abc%'</code>) in many locales. The <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">varchar_pattern_ops</code> operator class forces character-by-character scans, allowing PostgreSQL to perform index scans for prefix match queries."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q7: Explain your BatchWriter design. How does it reduce database writes?</h3>
+<em> <strong>Answer</strong>: "Writing to a database synchronously for every search submission causes high write latency and connection pool exhaustion. Our <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">BatchWriter</code> buffers incoming search strings in an <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">asyncio.Queue</code>. Every 5 seconds or upon reaching 100 items, a background task drains the queue, aggregates duplicates (e.g., 10 searches for 'python' become a single SQL update with count += 10), and performs a single UPSERT, reducing database write operations by up to 90%."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q8: What relational mapping strategy did you use to link queries and logs in a batch flush?</h3>
+</em> <strong>Answer</strong>: "We split the schema into <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">queries</code> (historical counts) and <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">search_logs</code> (timestamps). In the batch flush, we execute an UPSERT into the <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">queries</code> table with a <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">RETURNING id</code> clause. This returns the primary key ID for both newly inserted and updated queries. We map these IDs in Python and perform a bulk insert into the <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">search_logs</code> table, maintaining full database relational integrity."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q9: How does your cache invalidation strategy work when query counts change?</h3>
+<em> <strong>Answer</strong>: "To prevent stale cache suggestions, our <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">BatchWriter</code> runs <strong>active prefix cache invalidation</strong> after a batch flush. For each unique search in the batch (e.g., 'iphone'), we generate all prefixes: 'i', 'ip', 'iph', ..., 'iphone'. We locate the responsible Redis client for each prefix using the consistent hash ring and delete the cached suggestion keys (<code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">suggest:basic:prefix</code> and <code class="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-100 font-mono text-sm border border-zinc-800">suggest:enhanced:prefix</code>)."
+<h3 class="text-xl font-semibold text-white tracking-tight mt-6 mb-3">Q10: What are tail latencies, and why do you measure P95 instead of average latency?</h3>
+</em> <strong>Answer</strong>: "Average latency hides outliers. If 95 search requests take 2ms and 5 requests take 500ms due to database queries on cache misses, the average is misleadingly low, but those 5 users experience lag. P95 latency guarantees that 95% of users experience search suggest speeds under that threshold, which is crucial for autocomplete where speed is the primary constraint."
+            </article>
+        </main>
+    </div>
+
+    <!-- Prism.js Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+</body>
+</html>
