@@ -21,14 +21,21 @@ def seed_historical_queries():
             print(f"[Seed Queries] Database already seeded with {queries_count} queries. Skipping.")
             return
             
-        csv_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "orcas_queries.csv")
-        # In Docker, we might copy it to app/data or relative path
-        if not os.path.exists(csv_path):
-            # Fallback path inside backend container if copied locally
-            csv_path = os.path.join(os.path.dirname(__file__), "data", "orcas_queries.csv")
-            
-        if not os.path.exists(csv_path):
-            print(f"[Seed Queries] ERROR: CSV dataset not found at {csv_path}")
+        possible_paths = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "orcas_queries.csv")), # local dev path relative to seed_queries.py
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "orcas_queries.csv")),       # Docker path relative to backend app
+            os.path.abspath(os.path.join(os.getcwd(), "data", "orcas_queries.csv")),                            # CWD/data/
+            "/app/data/orcas_queries.csv",                                                                     # Docker absolute path
+        ]
+        
+        csv_path = None
+        for p in possible_paths:
+            if os.path.exists(p):
+                csv_path = p
+                break
+                
+        if not csv_path:
+            print(f"[Seed Queries] ERROR: CSV dataset not found in any expected location: {possible_paths}")
             sys.exit(1)
             
         print(f"[Seed Queries] Seeding queries from {csv_path}...")

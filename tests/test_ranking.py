@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from backend.app.ranking import get_suggestions_basic, get_suggestions_enhanced
+from app.ranking import get_suggestions_basic, get_suggestions_enhanced
 
 def test_get_suggestions_basic_queries_correctly():
     mock_db = MagicMock()

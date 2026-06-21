@@ -1,5 +1,5 @@
 import pytest
-from backend.app.consistent_hashing import ConsistentHashRing
+from app.consistent_hashing import ConsistentHashRing
 
 def test_hash_ring_initialization():
     nodes = ["redis-1:6379", "redis-2:6379", "redis-3:6379"]

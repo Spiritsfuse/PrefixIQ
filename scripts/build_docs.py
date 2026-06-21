@@ -1,9 +1,9 @@
 import os
 import re
 
-# Navigation mapping of docs for sidebar render
 DOCS_STRUCTURE = [
     ("Master Navigation Index", "NAVIGATION.html"),
+    ("PrefixIQ Project Report", "project_report.html"),
     ("1. Fundamentals & Trade-offs", "fundamentals_and_tradeoffs.html"),
     ("2. Architecture & Components", "architecture_and_components.html"),
     ("3. Trending & Algorithms", "trending_and_algorithms.html"),

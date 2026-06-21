@@ -9,6 +9,9 @@ Welcome to the documentation suite for the **PrefixIQ Search Typeahead System**.
 ### 🗺️ [Master Navigation Index](file:///c:/Users/ADMIN/PrefixIQ/docs/NAVIGATION.md)
 - *Purpose*: The root directory mapping all system document components, dependencies, and viva pathways.
 
+### 📋 [PrefixIQ Project Report](file:///c:/Users/ADMIN/PrefixIQ/docs/project_report.md)
+- *Purpose*: Main submission project report summarizing architecture, database logs seeding, API schemas, design decisions, and performance outcomes.
+
 ### 📚 [1. System Fundamentals & Trade-offs](file:///c:/Users/ADMIN/PrefixIQ/docs/fundamentals_and_tradeoffs.md)
 - *Topics Covered*:
   - What is Search Typeahead? Why does it exist in Google/Amazon/YouTube?
