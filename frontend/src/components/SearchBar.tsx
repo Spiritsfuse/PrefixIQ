@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import useDebounce from "../hooks/useDebounce";
 
 interface SuggestionItem {
-  query: str;
+  query: string;
   count: number;
   score: number;
 }

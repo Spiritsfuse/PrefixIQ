@@ -9,6 +9,9 @@ import redis.asyncio as async_redis
 
 from .config import settings
 from .database import get_db, engine, Base
+from sqlalchemy import text
+
+APP_START_TIME = time.time()
 from .models import SearchQuery
 from .schemas import SearchSubmit, SearchResponse, SuggestionResponse, SuggestionItem, CacheDebugResponse
 from .consistent_hashing import ring
@@ -103,36 +106,47 @@ async def shutdown_event():
 async def health_check(db: Session = Depends(get_db)):
     """
     Simulates a production health check.
-    Validates connection to PostgreSQL database and at least one Redis node.
+    Returns postgres connection status, redis connections count, batch_writer status, and uptime.
     """
-    health_status = {
-        "status": "healthy",
-        "database": "unhealthy",
-        "redis_nodes": {}
-    }
+    uptime = round(time.time() - APP_START_TIME, 2)
     
-    # Check Database connection
+    postgres_status = "unhealthy"
     try:
         db.execute(text("SELECT 1"))
-        health_status["database"] = "healthy"
-    except Exception as e:
-        health_status["status"] = "degraded"
-        health_status["database"] = f"unhealthy: {str(e)}"
+        postgres_status = "healthy"
+    except:
+        pass
         
-    # Check Redis nodes connection status
-    healthy_redis_count = 0
+    redis_total = len(ring.redis_clients)
+    redis_connected = 0
     for node, client in ring.redis_clients.items():
         try:
             await client.ping()
-            health_status["redis_nodes"][node] = "healthy"
-            healthy_redis_count += 1
-        except Exception as e:
-            health_status["redis_nodes"][node] = f"unreachable: {str(e)}"
+            redis_connected += 1
+        except:
+            pass
             
-    if healthy_redis_count == 0:
-        health_status["status"] = "unhealthy"
+    batch_writer_status = "running" if batch_writer.is_running else "stopped"
+    
+    # Global state is healthy if postgres is healthy, all redis nodes are connected, and batch writer is running
+    status = "healthy"
+    if postgres_status != "healthy" or redis_connected < redis_total or batch_writer_status != "running":
+        status = "unhealthy"
         
-    if health_status["status"] != "healthy":
+    health_status = {
+        "status": status,
+        "services": {
+            "postgres": postgres_status,
+            "redis": {
+                "connected": redis_connected,
+                "total": redis_total
+            },
+            "batch_writer": batch_writer_status
+        },
+        "uptime_seconds": uptime
+    }
+    
+    if status != "healthy":
         raise HTTPException(status_code=503, detail=health_status)
         
     return health_status
@@ -161,7 +175,7 @@ async def suggest(
     redis_client = None
     node_name = "unknown"
     try:
-        redis_client, node_name, _ = await ring.get_client(normalized_prefix)
+        redis_client, node_name, _, _ = await ring.get_client(normalized_prefix)
         # Attempt to retrieve from Redis
         cached_data = await redis_client.get(cache_key)
         if cached_data:
@@ -217,6 +231,59 @@ async def search(payload: SearchSubmit):
     return SearchResponse()
 
 
+@app.get("/internal/db-suggest", response_model=SuggestionResponse)
+async def db_suggest(
+    q: str = Query("", description="The prefix string to match suggestions"),
+    mode: str = Query("basic", description="Ranking engine mode: 'basic' or 'enhanced'"),
+    db: Session = Depends(get_db)
+):
+    """
+    Internal-only database suggest endpoint.
+    Queries the database directly and bypasses Redis cache completely.
+    Used for benchmarking database vs. caching latencies.
+    """
+    normalized_prefix = q.strip().lower()
+    if not normalized_prefix:
+        return SuggestionResponse(suggestions=[], source="database")
+        
+    async with metrics_lock:
+        METRICS["db_reads"] += 1
+        
+    if mode == "enhanced":
+        raw_suggestions = get_suggestions_enhanced(db, normalized_prefix, limit=10)
+    else:
+        raw_suggestions = get_suggestions_basic(db, normalized_prefix, limit=10)
+        
+    suggestions = [
+        SuggestionItem(query=item[0], count=item[1], score=item[2])
+        for item in raw_suggestions
+    ]
+    return SuggestionResponse(suggestions=suggestions, source="database")
+
+
+@app.post("/internal/cache/clear")
+async def internal_cache_clear(prefix: str = Query(..., description="Prefix to clear cache for")):
+    """
+    Internal benchmarking helper.
+    Explicitly deletes keys associated with the prefix across Basic and Enhanced caches.
+    """
+    normalized = prefix.strip().lower()
+    if not normalized:
+        return {"message": "Empty prefix skipped"}
+        
+    deleted_keys = []
+    for mode in ["basic", "enhanced"]:
+        cache_key = f"suggest:{mode}:{normalized}"
+        try:
+            client, node, _, _ = await ring.get_client(normalized)
+            await client.delete(cache_key)
+            deleted_keys.append(cache_key)
+        except Exception as e:
+            print(f"[Cache Invalidate Error] Failed to delete key '{cache_key}' on node {node}: {e}")
+            
+    return {"message": f"Cleared cache for prefix '{normalized}'", "keys": deleted_keys}
+
+
 @app.get("/cache/debug", response_model=CacheDebugResponse)
 async def cache_debug(
     prefix: str = Query(..., description="Prefix to look up"),
@@ -225,18 +292,23 @@ async def cache_debug(
     """
     Debugs cache routing.
     Shows the physical node assigned to the prefix on the hash ring, key hash, 
-    and hit/miss status.
+    virtual node replica, cache status, and TTL.
     """
     normalized_prefix = prefix.strip().lower()
     cache_key = f"suggest:{mode}:{normalized_prefix}"
     
     try:
-        # Determine node assignment
-        redis_client, node_name, key_hash = await ring.get_client(normalized_prefix)
+        # Determine node assignment with virtual node details
+        redis_client, node_name, virtual_node, key_hash = await ring.get_client(normalized_prefix)
         
         # Check cache hit status
         cached_data = await redis_client.get(cache_key)
         hit = cached_data is not None
+        status = "HIT" if hit else "MISS"
+        
+        ttl = -2
+        if hit:
+            ttl = await redis_client.ttl(cache_key)
         
         suggestions = []
         if hit:
@@ -247,13 +319,20 @@ async def cache_debug(
         stats = ring.get_ring_distribution()
         distribution = {node: f"{count} virtual nodes" for node, count in stats.items()}
         
+        # Calculate dynamic uniformity percentages
+        uniformity = ring.calculate_uniformity_distribution()
+        
         return CacheDebugResponse(
-            prefix=normalized_prefix,
-            hash_value=key_hash,
+            key=cache_key,
+            hash=key_hash,
             assigned_node=node_name,
+            virtual_node=virtual_node,
             cache_hit=hit,
+            cache_status=status,
+            ttl=ttl,
             suggestions=suggestions,
-            ring_distribution=distribution
+            ring_distribution=distribution,
+            hash_distribution_percentage=uniformity
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cache debug inspection failed: {str(e)}")

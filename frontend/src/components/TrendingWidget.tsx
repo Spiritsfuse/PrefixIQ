@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 interface TrendingItem {
-  query: str;
+  query: string;
   count: number;
   score: number;
 }
@@ -9,7 +9,7 @@ interface TrendingItem {
 interface TrendingWidgetProps {
   mode: "basic" | "enhanced";
   setMode: (mode: "basic" | "enhanced") => void;
-  onItemClick: (query: str) => void;
+  onItemClick: (query: string) => void;
   refreshTrigger: number;
 }
 

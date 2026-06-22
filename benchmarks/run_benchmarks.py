@@ -10,121 +10,99 @@ API_URL = "http://localhost:8000"
 
 # Mock prefixes and queries to simulate real user behavior
 MOCK_PREFIXES = ["iph", "py", "wea", "bit", "next", "c++", "dock", "chat", "ten", "app", "mac", "gold", "goog"]
-MOCK_QUERIES = [
-    "iphone charger", "python tutorial", "weather in new york", "bitcoin price",
-    "nextjs 15 features", "c++ roadmap", "docker config", "chatgpt 5 leaks",
-    "tesla stock", "apple watch review", "macbook pro buy", "google flights"
-]
 
-async def benchmark_suggest(client: httpx.AsyncClient, mode: str) -> float:
-    """Sends a single suggest query and returns latency in milliseconds."""
-    prefix = random.choice(MOCK_PREFIXES)
+async def measure_request(client: httpx.AsyncClient, method: str, url: str, json_data=None) -> float:
+    """Sends a request and returns latency in milliseconds. Returns -1.0 on failure."""
     start = time.time()
     try:
-        res = await client.get(f"{API_URL}/suggest?q={prefix}&mode={mode}")
-        latency = (time.time() - start) * 1000  # Convert to ms
+        if method == "GET":
+            res = await client.get(url)
+        else:
+            res = await client.post(url, json=json_data)
+        latency = (time.time() - start) * 1000
         if res.status_code == 200:
             return latency
-        else:
-            return -1.0
+        return -1.0
     except Exception:
         return -2.0
 
-async def benchmark_search(client: httpx.AsyncClient) -> float:
-    """Sends a single search query and returns latency in milliseconds."""
-    query = random.choice(MOCK_QUERIES)
-    start = time.time()
-    try:
-        res = await client.post(f"{API_URL}/search", json={"query": query})
-        latency = (time.time() - start) * 1000  # Convert to ms
-        if res.status_code == 200:
-            return latency
-        else:
-            return -1.0
-    except Exception:
-        return -2.0
-
-async def run_benchmark_suite(num_requests: int = 200, concurrency: int = 10):
+async def run_benchmark_suite(num_requests: int = 150, concurrency: int = 5):
     print("=" * 60)
-    print("         PREFIXIQ SYSTEM BENCHMARK PERFORMANCE SUITE         ")
+    print("         PREFIXIQ SYSTEM COMPARATIVE BENCHMARK SUITE         ")
     print("=" * 60)
     print(f"Target API Endpoint: {API_URL}")
-    print(f"Total Requests: {num_requests} | Concurrency: {concurrency}")
+    print(f"Total Cycles: {num_requests} | Concurrency: {concurrency}")
     print("-" * 60)
 
     limits = httpx.Limits(max_keepalive_connections=concurrency, max_connections=concurrency)
-    async with httpx.AsyncClient(limits=limits, timeout=5.0) as client:
-        
-        # 1. Benchmark Autocomplete GET /suggest (Basic Mode)
-        print("Warmup: Warming up caches...")
-        # Send a few warm-up queries
-        await asyncio.gather(*[benchmark_suggest(client, "basic") for _ in range(20)])
-        
-        print("Benchmarking Autocomplete GET /suggest (Basic)...")
-        suggest_basic_latencies = []
-        # Run in concurrent chunks
+    
+    db_only_latencies = []
+    cold_cache_latencies = []
+    warm_cache_latencies = []
+
+    async with httpx.AsyncClient(limits=limits, timeout=10.0) as client:
+        # We process in small concurrent chunks to simulate concurrent traffic
         for i in range(0, num_requests, concurrency):
-            tasks = [benchmark_suggest(client, "basic") for _ in range(concurrency)]
-            results = await asyncio.gather(*tasks)
-            suggest_basic_latencies.extend([r for r in results if r > 0])
+            prefixes_chunk = [random.choice(MOCK_PREFIXES) for _ in range(concurrency)]
+
+            # 1. DB ONLY (Bypassing Redis Caching via /internal/db-suggest)
+            db_tasks = [
+                measure_request(client, "GET", f"{API_URL}/internal/db-suggest?q={pref}&mode=basic")
+                for pref in prefixes_chunk
+            ]
+            db_results = await asyncio.gather(*db_tasks)
+            db_only_latencies.extend([r for r in db_results if r > 0])
+
+            # 2. COLD REDIS CACHE (Clear key first, then query autocomplete suggest)
+            # Clear keys in parallel
+            clear_tasks = [
+                measure_request(client, "POST", f"{API_URL}/internal/cache/clear?prefix={pref}")
+                for pref in prefixes_chunk
+            ]
+            await asyncio.gather(*clear_tasks)
             
-        # 2. Benchmark Autocomplete GET /suggest (Enhanced Mode)
-        print("Benchmarking Autocomplete GET /suggest (Enhanced)...")
-        suggest_enhanced_latencies = []
-        for i in range(0, num_requests, concurrency):
-            tasks = [benchmark_suggest(client, "enhanced") for _ in range(concurrency)]
-            results = await asyncio.gather(*tasks)
-            suggest_enhanced_latencies.extend([r for r in results if r > 0])
+            # Query suggest (will miss, query DB, and write-back to cache)
+            cold_tasks = [
+                measure_request(client, "GET", f"{API_URL}/suggest?q={pref}&mode=basic")
+                for pref in prefixes_chunk
+            ]
+            cold_results = await asyncio.gather(*cold_tasks)
+            cold_cache_latencies.extend([r for r in cold_results if r > 0])
 
-        # 3. Benchmark Search POST /search (Batch Writer buffer)
-        print("Benchmarking Search Submit POST /search...")
-        search_latencies = []
-        for i in range(0, num_requests, concurrency):
-            tasks = [benchmark_search(client) for _ in range(concurrency)]
-            results = await asyncio.gather(*tasks)
-            search_latencies.extend([r for r in results if r > 0])
+            # 3. WARM REDIS CACHE (Query suggest immediately again -> guaranteed cache hit)
+            warm_tasks = [
+                measure_request(client, "GET", f"{API_URL}/suggest?q={pref}&mode=basic")
+                for pref in prefixes_chunk
+            ]
+            warm_results = await asyncio.gather(*warm_tasks)
+            warm_cache_latencies.extend([r for r in warm_results if r > 0])
 
-        def print_stats(name: str, latencies: list):
+        def compute_percentiles(latencies: list) -> tuple:
             if not latencies:
-                print(f"Error: No successful requests recorded for {name}.")
-                return
+                return (0.0, 0.0, 0.0)
             avg = sum(latencies) / len(latencies)
             p50 = statistics.median(latencies)
-            # Calculate P95
             sorted_lats = sorted(latencies)
-            p95 = sorted_lats[int(len(sorted_lats) * 0.95)]
-            
-            print(f"\nStats for {name}:")
-            print(f"  Success Rate : {len(latencies)} / {num_requests} ({round(len(latencies)/num_requests*100, 1)}%)")
-            print(f"  Average Lat  : {round(avg, 2)} ms")
-            print(f"  P50 Latency  : {round(p50, 2)} ms")
-            print(f"  P95 Latency  : {round(p95, 2)} ms (Scrape/Scrub standard)")
-            print("-" * 60)
+            p95 = sorted_lats[int(len(sorted_lats) * 0.95)] if len(sorted_lats) > 1 else avg
+            return avg, p50, p95
 
-        print_stats("GET /suggest (Basic, Cache sharded)", suggest_basic_latencies)
-        print_stats("GET /suggest (Enhanced, Recency-aware)", suggest_enhanced_latencies)
-        print_stats("POST /search (Batch Writer queue buffer)", search_latencies)
-        
-        # Check active batch writer write metrics
-        try:
-            res = await client.get(f"{API_URL}/metrics")
-            if res.status_code == 200:
-                m = res.json()
-                reduction = m["database_metrics"]["batch_write_reduction_percentage"]
-                total_rec = m["database_metrics"]["db_reads"] + m["database_metrics"]["db_writes"]
-                print(f"Batching Effectiveness:")
-                print(f"  Write Reduction Factor: {reduction}%")
-                print(f"  Avg Flush Batch Size  : {m['database_metrics']['average_batch_size']}")
-                print(f"  DB Writes Performed   : {m['database_metrics']['db_writes']} flushes")
-        except Exception:
-            pass
+        db_avg, db_p50, db_p95 = compute_percentiles(db_only_latencies)
+        cold_avg, cold_p50, cold_p95 = compute_percentiles(cold_cache_latencies)
+        warm_avg, warm_p50, warm_p95 = compute_percentiles(warm_cache_latencies)
+
+        print("\n### Caching Performance Comparison Table")
+        print("\n| Scenario | Avg Latency | P50 (Median) | P95 Latency | Success Rate |")
+        print("| :--- | :---: | :---: | :---: | :---: |")
+        print(f"| **DB Only (Cache Bypassed)** | {db_avg:.2f} ms | {db_p50:.2f} ms | {db_p95:.2f} ms | {len(db_only_latencies)}/{num_requests} |")
+        print(f"| **Cold Redis (Cache Miss)**  | {cold_avg:.2f} ms | {cold_p50:.2f} ms | {cold_p95:.2f} ms | {len(cold_cache_latencies)}/{num_requests} |")
+        print(f"| **Warm Redis (Cache Hit)**   | {warm_avg:.2f} ms | {warm_p50:.2f} ms | {warm_p95:.2f} ms | {len(warm_cache_latencies)}/{num_requests} |")
+        print("\n" + "=" * 60)
 
 if __name__ == "__main__":
-    # Check if backend is running
+    # Check if backend is running on localhost:8000
     try:
         import socket
         s = socket.socket()
-        # Parse host and port
         s.settimeout(1.0)
         s.connect(("localhost", 8000))
         s.close()

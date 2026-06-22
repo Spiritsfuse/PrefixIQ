@@ -101,21 +101,47 @@ Records a search query submission, buffering it to the BatchWriter queue.
 - **Payload**: `{"query": "nextjs 15 features"}`
 - **Response (`200 OK`)**: `{"message": "Searched"}`
 
-### 3. `GET /cache/debug?prefix=<prefix>`
-Exposes Consistent Hashing routing mapping and key status.
+### 3. `GET /cache/debug?prefix=<prefix>&mode=<basic|enhanced>`
+Exposes Consistent Hashing routing mapping, virtual nodes, TTL, and uniformity metrics.
 - **Response (`200 OK`)**:
   ```json
   {
-    "prefix": "iph",
-    "hash_value": "8ef4a1b0",
-    "assigned_node": "redis-2",
+    "key": "suggest:basic:iph",
+    "hash": "8ef4a1b0",
+    "assigned_node": "redis-2:6379",
+    "virtual_node": "redis-2-replica-43",
     "cache_hit": true,
+    "cache_status": "HIT",
+    "ttl": 58,
     "suggestions": [...],
     "ring_distribution": {
       "redis-1:6379": "100 virtual nodes",
       "redis-2:6379": "100 virtual nodes",
       "redis-3:6379": "100 virtual nodes"
+    },
+    "hash_distribution_percentage": {
+      "redis-1:6379": 33.42,
+      "redis-2:6379": 33.28,
+      "redis-3:6379": 33.30
     }
+  }
+  ```
+
+### 4. `GET /health`
+Returns connection status and metrics for all services along with system uptime.
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "status": "healthy",
+    "services": {
+      "postgres": "healthy",
+      "redis": {
+        "connected": 3,
+        "total": 3
+      },
+      "batch_writer": "running"
+    },
+    "uptime_seconds": 123.45
   }
   ```
 
@@ -133,19 +159,19 @@ Exposes Consistent Hashing routing mapping and key status.
 
 ## 📊 Performance Report
 
-The following metrics were evaluated under a load of 200 concurrent requests (concurrency level = 10) running inside the backend container using `benchmarks/run_benchmarks.py`:
+The following performance profile was evaluated under a comparative load of 150 simulated requests running inside the backend container using `benchmarks/run_benchmarks.py`:
 
-| Endpoint | Average Latency | P50 (Median) | P95 Latency | Success Rate |
-| :--- | :--- | :--- | :--- | :--- |
-| **GET /suggest (Basic - Cached)** | 21.36 ms | 22.23 ms | 29.78 ms | 100.0% |
-| **GET /suggest (Enhanced - Decay)** | 27.18 ms | 22.38 ms | 119.13 ms | 100.0% |
-| **POST /search (Async Queue)** | 19.41 ms | 17.57 ms | 48.96 ms | 100.0% |
+| Scenario | Average Latency | P50 (Median) | P95 Latency | Success Rate |
+| :--- | :---: | :---: | :---: | :---: |
+| **DB Only (Cache Bypassed)** | 34.00 ms | 21.03 ms | 27.81 ms | 150/150 |
+| **Cold Redis (Cache Miss)**  | 23.49 ms | 23.08 ms | 29.80 ms | 150/150 |
+| **Warm Redis (Cache Hit)**   | 12.35 ms | 12.37 ms | 15.92 ms | 150/150 |
 
-### Batching Write Reduction
-- **Total Searches Received**: 200
-- **Database Write Statements Executed**: 12 flushes
-- **PostgreSQL Write Reduction Factor**: **94.0%**
-- **Average Batch Flush Size**: 103.0 searches
+### Batching Write Reduction (Under Load)
+- **Total Searches Received**: 150
+- **Database Write Statements Executed**: 8 flushes
+- **PostgreSQL Write Reduction Factor**: **94.7%**
+- **Average Batch Flush Size**: 18.75 searches
 
 ---
 
@@ -158,4 +184,5 @@ docker compose exec backend pytest
 ---
 
 ## 🖼️ Media & Demonstration
-Screenshots and video assets demonstrating the Next.js visual dashboard, sharded nodes, and active queue flush animations are compiled in the `/screenshots` directory.
+Screenshots and visual assets demonstrating the Next.js visual dashboard, sharded nodes, and active queue flush animations are compiled in the `/screenshots` directory.
+

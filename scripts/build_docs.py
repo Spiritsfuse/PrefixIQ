@@ -4,16 +4,14 @@ import re
 DOCS_STRUCTURE = [
     ("Master Navigation Index", "NAVIGATION.html"),
     ("PrefixIQ Project Report", "project_report.html"),
-    ("1. Fundamentals & Trade-offs", "fundamentals_and_tradeoffs.html"),
-    ("2. Architecture & Components", "architecture_and_components.html"),
-    ("3. Trending & Algorithms", "trending_and_algorithms.html"),
-    ("4. Infrastructure & Performance", "docker_and_performance.html"),
-    ("5. Code & Viva Prep Guide", "viva_preparation_guide.html"),
+    ("Dataset Specification", "dataset.html"),
 ]
 
 PRIVATE_DOCS_STRUCTURE = [
     ("Back to Main Docs", "../../docs/html/NAVIGATION.html"),
-    ("Private Viva & Flashcards", "viva_notes_and_flashcards.html")
+    ("PrefixIQ System Handbook", "PrefixIQ-System-Handbook.html"),
+    ("Viva Mock Questions Guide", "viva.html"),
+    ("Quick Revision Flashcards", "flashcards.html"),
 ]
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -99,8 +97,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     {sidebar}
                 </nav>
             </div>
-            <div class="pt-6 border-t border-zinc-900 text-xs text-zinc-600">
-                PrefixIQ System Design Guide
+            <div class="pt-6 border-t border-zinc-900 text-xs text-zinc-650">
+                PrefixIQ System Design Handbook
             </div>
         </aside>
 
@@ -143,7 +141,7 @@ def parse_markdown(md_text):
     def replace_alert(match):
         alert_type = match.group(1).upper()
         content = match.group(2).strip()
-        color_class = "border-violet-600 bg-violet-950/20 text-violet-300" if alert_type == "IMPORTANT" else "border-zinc-700 bg-zinc-900/40 text-zinc-300"
+        color_class = "border-violet-650 bg-violet-950/20 text-violet-300" if alert_type == "IMPORTANT" else "border-zinc-700 bg-zinc-900/40 text-zinc-300"
         return f'<div class="border-l-4 p-4 rounded-r-lg my-6 {color_class}"><strong class="block text-xs uppercase tracking-wide mb-1 text-white">{alert_type}</strong>{content}</div>'
     
     html = re.sub(r'^>\s*\[!([a-zA-Z]+)\]\s*\n((?:^>.*$\n?)+)', lambda m: replace_alert(MagicMock(group=lambda i: m.group(i).replace('>', '').strip() if i==1 else m.group(i).replace('\n> ', '\n').replace('> ', ''))), html, flags=re.MULTILINE)
@@ -174,7 +172,6 @@ def parse_markdown(md_text):
     html = html.replace('`[x]`', '<span class="inline-block w-4 h-4 rounded border border-violet-600 bg-violet-950 text-violet-300 flex items-center justify-center text-[10px] mr-2">✓</span>')
 
     # 6. Tables
-    # Simply replace Markdown tables with standard HTML wrapper tags
     def table_converter(match):
         table_lines = match.group(0).strip().split('\n')
         if len(table_lines) < 2:
@@ -199,7 +196,6 @@ def parse_markdown(md_text):
     html = re.sub(r'((?:^\|.+$\n?)+)', table_converter, html, flags=re.MULTILINE)
 
     # Bold and Italic formatting
-    html = re.sub(r'\*\*([^*]+)\*\*规定', r'<strong>\1</strong>', html) # Clean replacements
     html = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', html)
     html = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', html)
 
@@ -237,7 +233,7 @@ def build_docs():
         )
     sidebar_public_html = "\n".join(sidebar_public)
 
-    print("Building public documentation pages...")
+    print("Building local submission documentation pages...")
     for label, filename in DOCS_STRUCTURE:
         md_name = filename.replace(".html", ".md")
         md_path = os.path.join(docs_dir, md_name)
@@ -272,23 +268,30 @@ def build_docs():
     sidebar_private_html = "\n".join(sidebar_private)
 
     print("Building private documentation pages...")
-    md_name = "viva_notes_and_flashcards.md"
-    md_path = os.path.join(priv_docs_dir, md_name)
-    if os.path.exists(md_path):
+    for label, filename in PRIVATE_DOCS_STRUCTURE:
+        # Ignore back links
+        if filename.startswith("../"):
+            continue
+            
+        md_name = filename.replace(".html", ".md")
+        md_path = os.path.join(priv_docs_dir, md_name)
+        if not os.path.exists(md_path):
+            continue
+            
         with open(md_path, "r", encoding="utf-8") as f:
             md_content = f.read()
             
         parsed_html = parse_markdown(md_content)
         full_html = HTML_TEMPLATE.format(
-            title="Private Viva Cheatsheets",
+            title=label,
             sidebar=sidebar_private_html,
             content=parsed_html
         )
         
-        out_path = os.path.join(html_priv_docs_dir, "viva_notes_and_flashcards.html")
+        out_path = os.path.join(html_priv_docs_dir, filename)
         with open(out_path, "w", encoding="utf-8") as f_out:
             f_out.write(full_html)
-        print(f"  Compiled: {md_name} -> private-docs/html/viva_notes_and_flashcards.html")
+        print(f"  Compiled: {md_name} -> private-docs/html/{filename}")
 
     print("Docs compilation complete. You can open any HTML page directly in your browser!")
 

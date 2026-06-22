@@ -18,8 +18,8 @@ def test_hash_ring_routing_consistency():
     ring = ConsistentHashRing(nodes=nodes, replica_count=50)
     
     # Multiple lookups for the same key should resolve to the same node deterministically
-    node1, hash1 = ring.get_node("iphone charger")
-    node2, hash2 = ring.get_node("iphone charger")
+    node1, _, hash1 = ring.get_node("iphone charger")
+    node2, _, hash2 = ring.get_node("iphone charger")
     
     assert node1 == node2
     assert hash1 == hash2
@@ -31,7 +31,7 @@ def test_hash_ring_node_removal_failover():
     
     # Resolve node for a target query prefix
     target_prefix = "python roadmap"
-    primary_node, _ = ring.get_node(target_prefix)
+    primary_node, _, _ = ring.get_node(target_prefix)
     
     # Remove that specific node from the ring
     ring.remove_node(primary_node)
@@ -40,6 +40,6 @@ def test_hash_ring_node_removal_failover():
     assert len(ring.ring) == 40  # 60 - 20 = 40
     
     # Query should route to one of the remaining active hosts
-    fallback_node, _ = ring.get_node(target_prefix)
+    fallback_node, _, _ = ring.get_node(target_prefix)
     assert fallback_node != primary_node
     assert fallback_node in ring.redis_clients.keys()

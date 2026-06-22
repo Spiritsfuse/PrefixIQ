@@ -183,7 +183,7 @@ class BatchWriter:
                     cache_key = f"suggest:{mode}:{prefix}"
                     try:
                         # Locate correct Redis client using Consistent Hashing
-                        client, node, _ = await ring.get_client(prefix)
+                        client, node, _, _ = await ring.get_client(prefix)
                         await client.delete(cache_key)
                     except Exception as e:
                         # Log error but continue so other invalidations succeed

@@ -17,9 +17,13 @@ class SuggestionResponse(BaseModel):
     source: str  # "cache" or "database"
 
 class CacheDebugResponse(BaseModel):
-    prefix: str
-    hash_value: str
+    key: str
+    hash: str
     assigned_node: str
+    virtual_node: str
     cache_hit: bool
+    cache_status: str
+    ttl: int
     suggestions: List[SuggestionItem]
-    ring_distribution: Dict[str, str]  # Physical node to hash-ranges/vnode-counts
+    ring_distribution: Dict[str, str]
+    hash_distribution_percentage: Dict[str, float]

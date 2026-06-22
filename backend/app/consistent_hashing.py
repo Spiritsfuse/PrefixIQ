@@ -16,7 +16,7 @@ class ConsistentHashRing:
         :param replica_count: Number of virtual nodes (replicas) per physical node to ensure uniform key distribution
         """
         self.replica_count = replica_count
-        self.ring: Dict[int, str] = {}  # Map of virtual node hash -> physical node name
+        self.ring: Dict[int, Tuple[str, str]] = {}  # Map of virtual node hash -> (physical node name, virtual node key)
         self.sorted_keys: List[int] = []  # Sorted list of virtual node hashes
         self.redis_clients: Dict[str, async_redis.Redis] = {}
         
@@ -40,7 +40,7 @@ class ConsistentHashRing:
         """
         if node in self.redis_clients:
             return  # Already added
-            
+        
         host, port = node.split(":")
         # Instantiate async Redis client with decode_responses=True to handle strings directly
         self.redis_clients[node] = async_redis.Redis(
@@ -54,7 +54,7 @@ class ConsistentHashRing:
         for i in range(self.replica_count):
             virtual_key = f"{node}-replica-{i}"
             val = self._hash(virtual_key)
-            self.ring[val] = node
+            self.ring[val] = (node, virtual_key)
             self.sorted_keys.append(val)
             
         # Re-sort virtual node hashes to enable binary search lookups
@@ -82,7 +82,7 @@ class ConsistentHashRing:
                 
         logger.info(f"[ConsistentHashRing] Removed physical node: {node}.")
 
-    def get_node(self, key: str) -> Tuple[str, int]:
+    def get_node(self, key: str) -> Tuple[str, str, int]:
         """
         Maps a search prefix or cache key to its corresponding physical node in the hash ring.
         Uses binary search (bisect) for O(log N) routing complexity.
@@ -100,16 +100,16 @@ class ConsistentHashRing:
             idx = 0
             
         assigned_hash = self.sorted_keys[idx]
-        assigned_node = self.ring[assigned_hash]
-        return assigned_node, key_hash
+        assigned_node, virtual_node = self.ring[assigned_hash]
+        return assigned_node, virtual_node, key_hash
 
-    async def get_client(self, key: str) -> Tuple[async_redis.Redis, str, str]:
+    async def get_client(self, key: str) -> Tuple[async_redis.Redis, str, str, str]:
         """
         Helper method to retrieve the active Redis client, physical node name,
-        and the hexadecimal hash value for a search key.
+        virtual node name, and the hexadecimal hash value for a search key.
         """
-        node, key_hash = self.get_node(key)
-        return self.redis_clients[node], node, f"{key_hash:08x}"
+        node, virtual_node, key_hash = self.get_node(key)
+        return self.redis_clients[node], node, virtual_node, f"{key_hash:08x}"
         
     def get_ring_distribution(self) -> Dict[str, int]:
         """
@@ -117,10 +117,32 @@ class ConsistentHashRing:
         to verify mapping uniformity.
         """
         stats = {node: 0 for node in self.redis_clients}
-        for node in self.ring.values():
+        for node, _ in self.ring.values():
             if node in stats:
                 stats[node] += 1
         return stats
+
+    def calculate_uniformity_distribution(self) -> Dict[str, float]:
+        """
+        Simulates routing 10,000 keys to measure and demonstrate uniform distribution.
+        Returns percentage mapping for each node.
+        """
+        counts = {node: 0 for node in self.redis_clients}
+        if not self.ring:
+            return {node: 0.0 for node in self.redis_clients}
+            
+        for i in range(10000):
+            key = f"suggest-test-key-prefix-{i}"
+            key_hash = self._hash(key)
+            idx = bisect.bisect_right(self.sorted_keys, key_hash)
+            if idx == len(self.sorted_keys):
+                idx = 0
+            assigned_hash = self.sorted_keys[idx]
+            node_name, _ = self.ring[assigned_hash]
+            counts[node_name] += 1
+            
+        total = 10000
+        return {node: round((count / total) * 100, 2) for node, count in counts.items()}
 
 # Global singleton instance of the Hash Ring
 ring = ConsistentHashRing(nodes=settings.redis_node_list)
