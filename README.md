@@ -87,7 +87,7 @@ PrefixIQ uses a synthetic query frequency CSV (`data/orcas_queries.csv`) generat
 - **Definition**: The `search_count` column represents the baseline popularity (search frequency) of a specific query phrase.
 - **Source**: It is generated synthetically following Zipf's Law, representing realistic search popularity.
 - **Updates**: When a search is submitted via `POST /search`, it is enqueued in the `BatchWriter` buffer. The background worker aggregates incoming searches in memory and performs a bulk PostgreSQL `UPSERT` using `ON CONFLICT (query) DO UPDATE SET search_count = queries.search_count + EXCLUDED.search_count`, incrementing the baseline search popularity count.
-- **Autocomplete Scoring**: In basic mode, autocomplete suggestions are sorted strictly by `search_count` in descending order. In enhanced mode, it determines the baseline weight via the logarithmic historical popularity term: $0.8 \times \ln(\text{search\_count} + 1)$.
+- **Autocomplete Scoring**: In basic mode, autocomplete suggestions are sorted strictly by `search_count` in descending order. In enhanced mode, it determines the baseline weight via the logarithmic historical popularity term: $0.8 \times \ln(Count_{historical} + 1)$.
 
 The database seeding is fully automated and runs sequentially during backend startup:
 1. **Queries Seeder**: `seed_queries.py` reads `data/orcas_queries.csv` in chunks of 10,000 and executes bulk inserts into the `queries` table. If the database already contains records but fewer than 500,000 queries, it truncates the table with a CASCADE block and re-seeds.
