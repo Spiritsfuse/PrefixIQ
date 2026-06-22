@@ -10,7 +10,8 @@ DOCS_STRUCTURE = [
 PRIVATE_DOCS_STRUCTURE = [
     ("Back to Main Docs", "../../docs/html/NAVIGATION.html"),
     ("PrefixIQ System Handbook", "PrefixIQ-System-Handbook.html"),
-    ("Viva Mock Questions Guide", "viva.html"),
+    ("Implementation Roadmap", "implementation-roadmap.html"),
+    ("System Design Interview Guide", "viva.html"),
     ("Quick Revision Flashcards", "flashcards.html"),
 ]
 

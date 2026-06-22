@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal, engine, Base
 from .models import SearchQuery
 
-def seed_historical_queries():
+def seed_historical_queries(force: bool = False):
     """
-    Seeds the PostgreSQL database with the preprocessed ORCAS historical queries 
+    Seeds the PostgreSQL database with the synthetic historical queries 
     from the CSV file, preserving the Zipfian distribution counts.
     """
     db = SessionLocal()
@@ -17,9 +17,19 @@ def seed_historical_queries():
         
         # Check if already seeded
         queries_count = db.query(SearchQuery).count()
-        if queries_count >= 100000:
+        
+        # Reseed if force is true, DB is empty, or count is not in target range
+        needs_seeding = force or queries_count == 0 or not (599000 <= queries_count <= 601000)
+        
+        if not needs_seeding:
             print(f"[Seed Queries] Database already seeded with {queries_count} queries. Skipping.")
             return
+            
+        if queries_count > 0:
+            from sqlalchemy import text
+            print(f"[Seed Queries] Database has {queries_count} queries. Truncating table to re-seed...")
+            db.execute(text("TRUNCATE TABLE queries CASCADE"))
+            db.commit()
             
         possible_paths = [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "orcas_queries.csv")), # local dev path relative to seed_queries.py
@@ -75,4 +85,5 @@ def seed_historical_queries():
         db.close()
 
 if __name__ == "__main__":
-    seed_historical_queries()
+    force_reseed = "--force" in sys.argv
+    seed_historical_queries(force=force_reseed)

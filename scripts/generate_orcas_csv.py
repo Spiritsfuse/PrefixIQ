@@ -5,11 +5,10 @@ import sys
 
 def generate_orcas_subset():
     """
-    Generates a preprocessed query click-log frequency CSV representing 
-    a processed subset of the Microsoft ORCAS click log.
-    Outputs at least 100,000+ unique query-count mappings.
+    Generates a synthetic query click-log frequency CSV representing 
+    a benchmark dataset following Zipf's Law distribution.
+    Outputs at least 600,000+ unique query-count mappings.
     """
-    # Core domain-specific query subjects
     subjects = [
         "python", "javascript", "java", "c++", "rust", "go", "react", "nextjs", "vue", "angular",
         "node", "fastapi", "django", "flask", "spring boot", "postgresql", "mysql", "mongodb", "redis", "docker",
@@ -19,7 +18,8 @@ def generate_orcas_subset():
         "nike shoes", "adidas ultra boost", "rolex watch", "tesla model 3", "toyota rav4", "honda civic", "ford mustang", "starbucks coffee", "mcdonalds burger", "coca cola",
         "bitcoin", "ethereum", "solana", "cardano", "ripple", "dogecoin", "nvidia stock", "apple stock", "microsoft stock", "google stock",
         "weather in new york", "weather in london", "weather in tokyo", "weather in delhi", "weather in paris", "flights to hawaii", "flights to rome", "flights to bali", "hotels in vegas", "hotels in london",
-        "how to learn", "how to build", "how to code", "how to cook", "how to draw", "how to paint", "how to write", "how to read", "how to play", "how to run"
+        "how to learn", "how to build", "how to code", "how to cook", "how to draw", "how to paint", "how to write", "how to read", "how to play", "how to run",
+        "database", "data science", "data structures", "machine learning", "machine translation"
     ]
     
     # Prefix modifiers/qualifiers
@@ -40,12 +40,12 @@ def generate_orcas_subset():
         
     # 2. Add subject + modifier combinations
     # Generates unique combinations until we have over 105,000 unique queries
-    while len(queries) < 105000:
+    while len(queries) < 600000:
         s = random.choice(subjects)
         m1 = random.choice(modifiers)
         queries.add(f"{s} {m1}")
         
-        if len(queries) < 105000:
+        if len(queries) < 600000:
             m2 = random.choice(modifiers)
             if m1 != m2:
                 prefix = random.choice(["best", "free", "latest", "how to", "where to buy", ""])

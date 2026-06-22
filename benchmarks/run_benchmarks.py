@@ -41,14 +41,26 @@ async def run_benchmark_suite(num_requests: int = 150, concurrency: int = 5):
     warm_cache_latencies = []
 
     async with httpx.AsyncClient(limits=limits, timeout=10.0) as client:
+        # Warmup connection pools and DB caches
+        print("Warming up HTTP connection pool and DB cache buffers...")
+        warmup_tasks = [
+            measure_request(client, "GET", f"{API_URL}/internal/db-suggest?q=warmup&mode=basic")
+            for _ in range(10)
+        ]
+        await asyncio.gather(*warmup_tasks)
+        print("Warmup complete. Starting benchmark runs...")
+        print("-" * 60)
+
         # We process in small concurrent chunks to simulate concurrent traffic
         for i in range(0, num_requests, concurrency):
-            prefixes_chunk = [random.choice(MOCK_PREFIXES) for _ in range(concurrency)]
+            # Generate separate chunks for each scenario to prevent buffer pool bias
+            db_prefixes = [random.choice(MOCK_PREFIXES) for _ in range(concurrency)]
+            cold_prefixes = [random.choice(MOCK_PREFIXES) for _ in range(concurrency)]
 
             # 1. DB ONLY (Bypassing Redis Caching via /internal/db-suggest)
             db_tasks = [
                 measure_request(client, "GET", f"{API_URL}/internal/db-suggest?q={pref}&mode=basic")
-                for pref in prefixes_chunk
+                for pref in db_prefixes
             ]
             db_results = await asyncio.gather(*db_tasks)
             db_only_latencies.extend([r for r in db_results if r > 0])
@@ -57,22 +69,22 @@ async def run_benchmark_suite(num_requests: int = 150, concurrency: int = 5):
             # Clear keys in parallel
             clear_tasks = [
                 measure_request(client, "POST", f"{API_URL}/internal/cache/clear?prefix={pref}")
-                for pref in prefixes_chunk
+                for pref in cold_prefixes
             ]
             await asyncio.gather(*clear_tasks)
             
             # Query suggest (will miss, query DB, and write-back to cache)
             cold_tasks = [
                 measure_request(client, "GET", f"{API_URL}/suggest?q={pref}&mode=basic")
-                for pref in prefixes_chunk
+                for pref in cold_prefixes
             ]
             cold_results = await asyncio.gather(*cold_tasks)
             cold_cache_latencies.extend([r for r in cold_results if r > 0])
 
-            # 3. WARM REDIS CACHE (Query suggest immediately again -> guaranteed cache hit)
+            # 3. WARM REDIS CACHE (Query suggest immediately again using the same cold_prefixes -> guaranteed cache hit)
             warm_tasks = [
                 measure_request(client, "GET", f"{API_URL}/suggest?q={pref}&mode=basic")
-                for pref in prefixes_chunk
+                for pref in cold_prefixes
             ]
             warm_results = await asyncio.gather(*warm_tasks)
             warm_cache_latencies.extend([r for r in warm_results if r > 0])

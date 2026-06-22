@@ -84,7 +84,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
   // Resolve prefix cache routing on the Consistent Hashing Ring
   const handleDebugResolve = async (e: React.FormEvent) => {
     e.preventDefault();
-    const prefix = debugPrefix.trim().lower();
+    const prefix = debugPrefix.trim().toLowerCase();
     if (!prefix) return;
 
     setDebugLoading(true);

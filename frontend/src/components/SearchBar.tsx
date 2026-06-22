@@ -10,10 +10,11 @@ interface SuggestionItem {
 interface SearchBarProps {
   mode: "basic" | "enhanced";
   onSearchSubmitted: () => void;
+  initialQuery?: string;
 }
 
-export default function SearchBar({ mode, onSearchSubmitted }: SearchBarProps) {
-  const [query, setQuery] = useState("");
+export default function SearchBar({ mode, onSearchSubmitted, initialQuery = "" }: SearchBarProps) {
+  const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -123,6 +124,12 @@ export default function SearchBar({ mode, onSearchSubmitted }: SearchBarProps) {
       setSearchResult("Error: Submission failed.");
     }
   };
+
+  useEffect(() => {
+    if (initialQuery && initialQuery.trim()) {
+      submitSearch(initialQuery);
+    }
+  }, [initialQuery]);
 
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col items-center">

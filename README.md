@@ -7,7 +7,24 @@
 [![Redis](https://img.shields.io/badge/Redis-v7.0-red?logo=redis&logoColor=white)](https://redis.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-PrefixIQ is a complete, production-inspired search suggestion and autocomplete engine designed to showcase core distributed systems, database sharding, write buffering, and recency-decay algorithms.
+PrefixIQ is a complete, production-inspired search suggestion and autocomplete engine designed to showcase core distributed systems concepts—including database sharding (Consistent Hashing), asynchronous write-buffering (BatchWriter), B-Tree range-scan index tuning, and recency-decay trending algorithms.
+
+The application is structured to center the **Search Typeahead Engine** as the primary focus, utilizing the UI design principle of **Progressive Disclosure** to keep developer diagnostics and sharding visualizers collapsible and accessible on-demand below the core search interface.
+
+---
+
+## 📋 Table of Contents
+
+- [🏗️ System Architecture](#️-system-architecture)
+- [🚀 Quick Start & Setup Instructions](#-quick-start--setup-instructions)
+- [📂 Dataset Source & Loading](#-dataset-source--loading)
+- [🔌 API Documentation](#-api-documentation)
+- [🛠️ Design Decisions & Trade-offs](#️-design-decisions--trade-offs)
+- [📊 Performance Report](#-performance-report)
+- [🧪 Verification & Testing](#-verification--testing)
+- [📖 Learning & Study Resources](#-learning--study-resources)
+- [🖼️ Media & Demonstration](#️-media--demonstration)
+- [📄 License](#-license)
 
 ---
 
@@ -56,35 +73,32 @@ docker compose up --build
 This starts the PostgreSQL database, three independent Redis cache instances, the FastAPI backend, and the Next.js web client. 
 
 ### 2. Access the Applications
-- **Frontend Dashboard & Search Box**: http://localhost:3000
+- **Frontend Search Engine & Dashboard**: http://localhost:3000
 - **API Swagger Documentation**: http://localhost:8000/docs
 - **Prometheus Metrics Scraper**: http://localhost:8000/metrics/prometheus
 
 ---
 
-## 📂 Dataset Source & Loading
+## 📂 Dataset Specification & Loading
 
-PrefixIQ uses a preprocessed query frequency CSV (`data/orcas_queries.csv`) modeled on the **Microsoft ORCAS click log dataset**, consisting of 105,000+ unique search terms distributed according to **Zipf's Law** (Power-Law Distribution). 
+PrefixIQ uses a synthetic query frequency CSV (`data/orcas_queries.csv`) generated using a **Zipfian (power-law) distribution**, consisting of **600,000+ unique search terms** modeled on realistic technical search topic patterns.
+
+### What is the "Count"?
+- **Definition**: The `search_count` column represents the baseline popularity (search frequency) of a specific query phrase.
+- **Source**: It is generated synthetically following Zipf's Law, representing realistic search popularity.
+- **Updates**: When a search is submitted via `POST /search`, it is enqueued in the `BatchWriter` buffer. The background worker aggregates incoming searches in memory and performs a bulk PostgreSQL `UPSERT` using `ON CONFLICT (query) DO UPDATE SET search_count = queries.search_count + EXCLUDED.search_count`, incrementing the baseline search popularity count.
+- **Autocomplete Scoring**: In basic mode, autocomplete suggestions are sorted strictly by `search_count` in descending order. In enhanced mode, it determines the baseline weight via the logarithmic historical popularity term: $0.8 \times \ln(\text{search\_count} + 1)$.
 
 The database seeding is fully automated and runs sequentially during backend startup:
-1. **Queries Seeder**: `seed_queries.py` reads `data/orcas_queries.csv` in chunks of 10,000 and executes bulk inserts into the `queries` table.
-2. **Logs Seeder**: `seed_recent_logs.py` populates the `search_logs` table with synthetic timestamped logs (in the last 2 hours) for 5 specific trending queries to showcase the recency-decay sorting.
-
-To trigger database seeding manually:
-```bash
-# Seed queries
-docker compose exec backend python -m app.seed_queries
-
-# Seed recent trending activity logs
-docker compose exec backend python -m app.seed_recent_logs
-```
+1. **Queries Seeder**: `seed_queries.py` reads `data/orcas_queries.csv` in chunks of 10,000 and executes bulk inserts into the `queries` table. If the database already contains records but fewer than 500,000 queries, it truncates the table with a CASCADE block and re-seeds.
+2. **Logs Seeder**: `seed_recent_logs.py` populates the `search_logs` table with synthetic timestamped logs (in the last 2 hours) for specific trending queries to showcase the recency-decay sorting.
 
 ---
 
 ## 🔌 API Documentation
 
 ### 1. `GET /suggest?q=<prefix>&mode=<basic|enhanced>`
-Fetches autocomplete suggestions matching the prefix.
+Fetches autocomplete suggestions matching the prefix (up to 10 suggestions, sorted deterministically).
 - **Parameters**:
   - `q` (string): Search query prefix (case-insensitive).
   - `mode` (string): `basic` (all-time count sorting) or `enhanced` (decay trending scoring).
@@ -154,18 +168,24 @@ Returns connection status and metrics for all services along with system uptime.
 - **Logarithmic + Exponential Decay Trending**: The scoring formula balances long-term popularity with recent spikes:
   $$Score = 0.8 \times \ln(Count_{historical} + 1) + 0.2 \times \sum e^{-\lambda \Delta t}$$
   Using the natural logarithm ($\ln$) compresses lifetime counts so they don't scale linearly, allowing recent trends to compete.
+- **Deterministic Ordering**: A secondary alphabetic sort criteria (`query ASC`) is specified in database queries to ensure that suggestions with identical click counts or scores maintain a stable order across repeated requests.
 
 ---
 
 ## 📊 Performance Report
 
-The following performance profile was evaluated under a comparative load of 150 simulated requests running inside the backend container using `benchmarks/run_benchmarks.py`:
+The following performance profile was evaluated under a comparative load of 150 simulated requests running inside the backend container using `benchmarks/run_benchmarks.py`.
+
+The benchmark features a **warmup phase** to eliminate connection pool initialization spikes, and uses **decoupled query prefixes** across scenarios to prevent PostgreSQL buffer cache pollution (buffer-warming bias).
 
 | Scenario | Average Latency | P50 (Median) | P95 Latency | Success Rate |
 | :--- | :---: | :---: | :---: | :---: |
-| **DB Only (Cache Bypassed)** | 34.00 ms | 21.03 ms | 27.81 ms | 150/150 |
-| **Cold Redis (Cache Miss)**  | 23.49 ms | 23.08 ms | 29.80 ms | 150/150 |
-| **Warm Redis (Cache Hit)**   | 12.35 ms | 12.37 ms | 15.92 ms | 150/150 |
+| **DB Only (Cache Bypassed)** | 37.01 ms | 35.29 ms | 53.98 ms | 150/150 |
+| **Cold Redis (Cache Miss)**  | 37.79 ms | 35.74 ms | 55.42 ms | 150/150 |
+| **Warm Redis (Cache Hit)**   | 15.43 ms | 14.65 ms | 21.79 ms | 150/150 |
+
+### Latency Discrepancy Note (Cold Redis vs DB Only)
+Cold Redis is slightly slower than DB Only due to cache check overhead, miss handling, database fallbacks, and write-back serialization to Redis. **Warm Redis** achieves the lowest latency (~14ms), proving the performance advantage of sharded cache hits.
 
 ### Batching Write Reduction (Under Load)
 - **Total Searches Received**: 150
@@ -176,13 +196,45 @@ The following performance profile was evaluated under a comparative load of 150 
 ---
 
 ## 🧪 Verification & Testing
+
 Execute the Pytest unit testing suite inside the backend container:
 ```bash
 docker compose exec backend pytest
 ```
 
+Run the API and end-to-end flow verification script (tests suggestions, batch updates, and cache invalidation):
+```bash
+docker compose exec backend python -m app.verify_system
+```
+
+---
+
+## 📖 Learning & Study Resources
+
+The codebase contains detailed engineering and learning resources located in [docs/](file:///c:/Users/ADMIN/PrefixIQ/docs) and [private-docs/](file:///c:/Users/ADMIN/PrefixIQ/private-docs):
+
+*   **[Master Navigation Index](file:///c:/Users/ADMIN/PrefixIQ/docs/NAVIGATION.md)**: Links all deliverables and learning guides.
+*   **[PrefixIQ System Handbook](file:///c:/Users/ADMIN/PrefixIQ/private-docs/PrefixIQ-System-Handbook.md)**: Details caching, consistent hashing, indexing, and decay scoring from first principles.
+*   **[Implementation Roadmap](file:///c:/Users/ADMIN/PrefixIQ/private-docs/implementation-roadmap.md)**: Describes implementation milestones, files introduced, and engineering decisions.
+*   **[System Design Interview Guide](file:///c:/Users/ADMIN/PrefixIQ/private-docs/viva.md)**: A Q&A study guide covering common system design questions on typeahead architectures.
+
 ---
 
 ## 🖼️ Media & Demonstration
-Screenshots and visual assets demonstrating the Next.js visual dashboard, sharded nodes, and active queue flush animations are compiled in the `/screenshots` directory.
 
+### 1. Autocomplete Search Bar
+The autocomplete search box dynamically queries the sharded Redis cluster and fetches suggestions sorted by popularity or decayed trending score, complete with responsive micro-animations:
+
+![Autocomplete Search Box](screenshots/search_box.png)
+
+### 2. Live System Metrics Dashboard & Hash Ring Resolver
+The system metrics dashboard displays live indicators (Cache Hit Rate, Batch Write Reduction, Latencies, Queue status, and Shard Health) and includes an interactive Hash Ring Resolver that visualizes virtual node routing:
+
+![System Metrics Dashboard & Consistent Hash Ring Resolver-1](screenshots/dashboard-1.png)
+![System Metrics Dashboard & Consistent Hash Ring Resolver-2](screenshots/dashboard-2.png)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
